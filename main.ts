@@ -1,12 +1,14 @@
 // main.ts — entrypoint for news-image-20261122.
-// Draws the 22 November 2026 front page and copies it to /output/entry.png.
+// Draws the 22 November 2026 front page and writes it to /output/entry.png.
 // Node 22 standard library only; no network, no dependencies.
-import { mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+//
+// The grader mounts the repository read-only, so this file must NEVER write
+// anything into the repository directory: the PNG goes straight to the
+// output directory (MAKEFUN_OUTPUT_DIR, default /output).
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildFrontPage } from './draw.mjs';
 
-const here = dirname(fileURLToPath(import.meta.url));
 const outDir = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 
 mkdirSync(outDir, { recursive: true });
@@ -26,7 +28,13 @@ if (png.length > 1048576) {
   throw new Error(`front page is ${png.length} bytes, over the 1 MiB limit`);
 }
 
-const tmpPath = join(here, 'entry.png');
-writeFileSync(tmpPath, png);
-copyFileSync(tmpPath, join(outDir, 'entry.png'));
-console.log(`wrote ${png.length} bytes to ${join(outDir, 'entry.png')}`);
+const outPath = join(outDir, 'entry.png');
+writeFileSync(outPath, png);
+
+// Read back what we just wrote: confirm the file landed whole and is
+// still a valid PNG (guards against a truncated write or a wrong path).
+const written = readFileSync(outPath);
+if (written.length !== png.length || !written.subarray(0, 8).equals(PNG_MAGIC)) {
+  throw new Error(`verification failed: ${outPath} is ${statSync(outPath).size} bytes, expected ${png.length} bytes of valid PNG`);
+}
+console.log(`wrote ${png.length} bytes to ${outPath} (verified)`);
